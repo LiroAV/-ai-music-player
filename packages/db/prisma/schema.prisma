@@ -1,0 +1,316 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Users ───────────────────────────────────────────────────────────────────
+
+model User {
+  id                  String           @id @default(uuid())
+  email               String           @unique
+  username            String           @unique
+  avatarUrl           String?
+  subscriptionTier    SubscriptionTier @default(free)
+  onboardingCompleted Boolean          @default(false)
+  country             String?
+  language            String           @default("en")
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  profile          UserProfile?
+  tracks           Track[]
+  playlists        Playlist[]
+  likedTracks      Like[]
+  ratings          Rating[]
+  followedStyles   UserFollowedStyle[]
+  listeningEvents  ListeningEvent[]
+  generationJobs   GenerationJob[]
+  recommendations  Recommendation[]
+
+  @@map("users")
+}
+
+model UserProfile {
+  id                    String   @id @default(uuid())
+  userId                String   @unique
+  tasteVectorJson       Json     @default("{}")
+  preferredGenresJson   Json     @default("{}")
+  preferredMoodsJson    Json     @default("{}")
+  preferredAttrsJson    Json     @default("{}")
+  noveltyTolerance      Float    @default(0.35)
+  lastUpdatedAt         DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+// ─── Tracks ──────────────────────────────────────────────────────────────────
+
+model Track {
+  id               String            @id @default(uuid())
+  title            String
+  artistName       String
+  audioUrl         String
+  previewUrl       String?
+  artworkUrl       String?
+  durationSeconds  Int
+  status           TrackStatus       @default(ready_public)
+  visibility       TrackVisibility   @default(public)
+  createdByUserId  String?
+  generationJobId  String?           @unique
+  primaryGenre     String
+  subgenresJson    Json              @default("[]")
+  moodsJson        Json              @default("[]")
+  attributesJson   Json              @default("{}")
+  qualityScore     Float             @default(0.5)
+  moderationStatus ModerationStatus  @default(approved)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  createdBy       User?          @relation(fields: [createdByUserId], references: [id])
+  generationJob   GenerationJob? @relation(fields: [generationJobId], references: [id])
+  likes           Like[]
+  ratings         Rating[]
+  playlistTracks  PlaylistTrack[]
+  listeningEvents ListeningEvent[]
+  recommendations Recommendation[]
+
+  @@index([status, visibility, qualityScore])
+  @@index([primaryGenre])
+  @@index([createdAt(sort: Desc)])
+  @@map("tracks")
+}
+
+// ─── Generation ──────────────────────────────────────────────────────────────
+
+model GenerationJob {
+  id                   String              @id @default(uuid())
+  userId               String
+  status               GenerationJobStatus @default(pending)
+  inputPrompt          String
+  structuredPromptJson Json
+  provider             String
+  model                String?
+  estimatedCost        Float?
+  actualCost           Float?
+  errorMessage         String?
+  createdAt            DateTime            @default(now())
+  startedAt            DateTime?
+  completedAt          DateTime?
+
+  user        User   @relation(fields: [userId], references: [id])
+  resultTrack Track?
+
+  @@index([userId, status])
+  @@index([createdAt(sort: Desc)])
+  @@map("generation_jobs")
+}
+
+// ─── Engagement ──────────────────────────────────────────────────────────────
+
+model ListeningEvent {
+  id              String             @id @default(uuid())
+  userId          String
+  trackId         String
+  eventType       ListeningEventType
+  positionSeconds Float?
+  sessionId       String
+  contextJson     Json               @default("{}")
+  createdAt       DateTime           @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([trackId, eventType])
+  @@index([sessionId])
+  @@map("listening_events")
+}
+
+model Like {
+  id        String   @id @default(uuid())
+  userId    String
+  trackId   String
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, trackId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("likes")
+}
+
+model Rating {
+  id        String   @id @default(uuid())
+  userId    String
+  trackId   String
+  rating    Int      // 1–5
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, trackId])
+  @@map("ratings")
+}
+
+// ─── Playlists ────────────────────────────────────────────────────────────────
+
+model Playlist {
+  id          String              @id @default(uuid())
+  userId      String
+  name        String
+  description String?
+  visibility  PlaylistVisibility  @default(private)
+  coverUrl    String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tracks PlaylistTrack[]
+
+  @@index([userId])
+  @@map("playlists")
+}
+
+model PlaylistTrack {
+  id         String   @id @default(uuid())
+  playlistId String
+  trackId    String
+  position   Int
+  addedAt    DateTime @default(now())
+
+  playlist Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  track    Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@unique([playlistId, trackId])
+  @@index([playlistId, position])
+  @@map("playlist_tracks")
+}
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+model Style {
+  id              String   @id @default(uuid())
+  name            String
+  slug            String   @unique
+  description     String?
+  parentStyleId   String?
+  imageUrl        String?
+  tagsJson        Json     @default("[]")
+  popularityScore Float    @default(0.0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  parent         Style?              @relation("StyleHierarchy", fields: [parentStyleId], references: [id])
+  children       Style[]             @relation("StyleHierarchy")
+  followedByUsers UserFollowedStyle[]
+
+  @@index([slug])
+  @@index([popularityScore(sort: Desc)])
+  @@map("styles")
+}
+
+model UserFollowedStyle {
+  id        String   @id @default(uuid())
+  userId    String
+  styleId   String
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  style Style @relation(fields: [styleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, styleId])
+  @@map("user_followed_styles")
+}
+
+// ─── Recommendations ─────────────────────────────────────────────────────────
+
+model Recommendation {
+  id              String   @id @default(uuid())
+  userId          String
+  trackId         String
+  score           Float
+  reason          String?
+  shownAt         DateTime @default(now())
+  interacted      Boolean  @default(false)
+  interactionType String?
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@index([userId, shownAt(sort: Desc)])
+  @@map("recommendations")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum SubscriptionTier {
+  free
+  plus
+  pro
+}
+
+enum TrackStatus {
+  requested
+  queued
+  generating
+  generated
+  processing
+  quality_check
+  ready_private
+  ready_public
+  rejected
+  archived
+}
+
+enum TrackVisibility {
+  public
+  private
+}
+
+enum ModerationStatus {
+  pending
+  approved
+  rejected
+  flagged
+}
+
+enum GenerationJobStatus {
+  pending
+  queued
+  processing
+  completed
+  failed
+  cancelled
+}
+
+enum ListeningEventType {
+  play
+  pause
+  skip
+  complete
+  replay
+  like
+  dislike
+  save
+  unsave
+  rate
+  add_to_playlist
+  remove_from_playlist
+  share
+  report
+}
+
+enum PlaylistVisibility {
+  public
+  private
+}
