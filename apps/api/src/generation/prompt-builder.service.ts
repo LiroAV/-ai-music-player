@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import type { GenerationRequest, StructuredPrompt } from '@music-gem2/types'
+import type { GenerationRequest, StructuredPrompt } from '@ai-music-player/types'
 
 const BLOCKED_ARTIST_PATTERNS = [
   /drake|kendrick|taylor swift|beyonc|eminem|kanye|adele|ed sheeran|billie eilish/i,

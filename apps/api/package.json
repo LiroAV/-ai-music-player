@@ -1,5 +1,5 @@
 {
-  "name": "@music-gem2/api",
+  "name": "@ai-music-player/api",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -10,8 +10,8 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@music-gem2/db": "workspace:*",
-    "@music-gem2/types": "workspace:*",
+    "@ai-music-player/db": "workspace:*",
+    "@ai-music-player/types": "workspace:*",
     "@nestjs/common": "^10.0.0",
     "@nestjs/core": "^10.0.0",
     "@nestjs/platform-express": "^10.0.0",

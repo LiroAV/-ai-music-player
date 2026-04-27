@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ['@music-gem2/types'],
+  transpilePackages: ['@ai-music-player/types'],
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '**.supabase.co' },

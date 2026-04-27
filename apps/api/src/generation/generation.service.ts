@@ -3,7 +3,7 @@ import { InjectQueue } from '@nestjs/bull'
 import { Queue } from 'bull'
 import { PrismaService } from '../prisma/prisma.service'
 import { PromptBuilderService } from './prompt-builder.service'
-import type { GenerationRequest, GenerationResponse } from '@music-gem2/types'
+import type { GenerationRequest, GenerationResponse } from '@ai-music-player/types'
 
 const REUSE_QUALITY_THRESHOLD = 0.6
 const MIN_REUSE_COUNT = 3

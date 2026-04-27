@@ -3,7 +3,7 @@ import { Logger, Inject } from '@nestjs/common'
 import { Job } from 'bull'
 import { PrismaService } from '../prisma/prisma.service'
 import type { IGenerationProvider } from './providers/mock.provider'
-import type { StructuredPrompt } from '@music-gem2/types'
+import type { StructuredPrompt } from '@ai-music-player/types'
 import { PromptBuilderService } from './prompt-builder.service'
 
 @Processor('generation')

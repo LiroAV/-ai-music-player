@@ -1,7 +1,7 @@
 import { Injectable, ConflictException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { SupabaseService } from './supabase.service'
-import type { User } from '@music-gem2/db'
+import type { User } from '@ai-music-player/db'
 
 @Injectable()
 export class AuthService {

@@ -2,7 +2,7 @@ import { Controller, Post, Get, Param, Body, UseGuards, Request } from '@nestjs/
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger'
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'
 import { GenerationService } from './generation.service'
-import type { GenerationRequest } from '@music-gem2/types'
+import type { GenerationRequest } from '@ai-music-player/types'
 
 @ApiTags('generation')
 @Controller('generate')

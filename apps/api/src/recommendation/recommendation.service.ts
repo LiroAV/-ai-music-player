@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
-import type { Track } from '@music-gem2/db'
+import type { Track } from '@ai-music-player/db'
 
 const EVENT_WEIGHTS: Record<string, number> = {
   like: 5,

@@ -1,5 +1,5 @@
 {
-  "name": "music-gem2",
+  "name": "ai-music-player",
   "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@9.0.0",
@@ -10,7 +10,7 @@
     "type-check": "turbo run type-check",
     "db:generate": "turbo run db:generate",
     "db:migrate": "turbo run db:migrate",
-    "db:seed": "pnpm --filter @music-gem2/db seed"
+    "db:seed": "pnpm --filter @ai-music-player/db seed"
   },
   "devDependencies": {
     "turbo": "^2.0.0",

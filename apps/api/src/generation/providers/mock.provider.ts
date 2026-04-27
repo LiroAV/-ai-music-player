@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import type { StructuredPrompt } from '@music-gem2/types'
+import type { StructuredPrompt } from '@ai-music-player/types'
 
 export interface IGenerationProvider {
   generate(prompt: StructuredPrompt, textPrompt: string): Promise<GenerationResult>

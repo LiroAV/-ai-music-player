@@ -1,5 +1,5 @@
 {
-  "name": "@music-gem2/db",
+  "name": "@ai-music-player/db",
   "version": "0.1.0",
   "private": true,
   "main": "./dist/index.js",

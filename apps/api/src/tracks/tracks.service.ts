@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { RecommendationService } from '../recommendation/recommendation.service'
-import type { ListeningEventType, Prisma } from '@music-gem2/db'
+import type { ListeningEventType, Prisma } from '@ai-music-player/db'
 import { PlayEventDto } from './dto/play-event.dto'
 
 const PUBLIC_TRACK_FILTER: Prisma.TrackWhereInput = {
