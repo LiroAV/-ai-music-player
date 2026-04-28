@@ -33,6 +33,26 @@ export class TracksController {
     return this.tracks.getDiscover(req.user.id, limit)
   }
 
+  @Get('liked')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  getLiked(
+    @Request() req: { user: { id: string } },
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
+  ) {
+    return this.tracks.getLikedTracks(req.user.id, limit)
+  }
+
+  @Get('recently-played')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  getRecentlyPlayed(
+    @Request() req: { user: { id: string } },
+    @Query('limit', new DefaultValuePipe(30), ParseIntPipe) limit: number,
+  ) {
+    return this.tracks.getRecentlyPlayed(req.user.id, limit)
+  }
+
   @Get('by-style/:styleId')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

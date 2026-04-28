@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { api } from '@/lib/api'
 
 const STYLES = [
   { slug: 'jazz', label: 'Jazz', desc: 'Warm, expressive, improvisational.' },
@@ -40,6 +41,7 @@ export default function OnboardingPage() {
   const [step, setStep] = useState<Step>('styles')
   const [selectedStyles, setSelectedStyles] = useState<string[]>([])
   const [selectedMoods, setSelectedMoods] = useState<string[]>([])
+  const [saving, setSaving] = useState(false)
 
   const toggleStyle = (slug: string) => {
     setSelectedStyles(prev =>
@@ -54,21 +56,14 @@ export default function OnboardingPage() {
     )
   }
 
-  const handleStylesNext = () => {
-    if (selectedStyles.length >= 3) setStep('moods')
-  }
-
   const handleFinish = async () => {
-    // Save preferences and redirect to app
+    setSaving(true)
     try {
-      await fetch('/api/profile/onboarding', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ selectedStyles, selectedMoods }),
-      })
+      await api.post('/profile/onboarding', { selectedStyles, selectedMoods })
     } catch {
-      // proceed even if API fails
+      // proceed even if API call fails — user can still listen
     }
+    setSaving(false)
     router.push('/home')
   }
 
@@ -101,7 +96,7 @@ export default function OnboardingPage() {
           </div>
 
           <button
-            onClick={handleStylesNext}
+            onClick={() => setStep('moods')}
             disabled={selectedStyles.length < 3}
             className="w-full py-4 rounded-2xl bg-accent text-white font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
           >
@@ -137,9 +132,10 @@ export default function OnboardingPage() {
 
           <button
             onClick={handleFinish}
-            className="w-full py-4 rounded-2xl bg-accent text-white font-semibold"
+            disabled={saving}
+            className="w-full py-4 rounded-2xl bg-accent text-white font-semibold disabled:opacity-50 transition-opacity"
           >
-            Start listening
+            {saving ? 'Saving…' : 'Start listening'}
           </button>
         </>
       )}

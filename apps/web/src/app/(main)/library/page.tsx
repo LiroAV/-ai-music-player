@@ -3,11 +3,13 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
-import { Plus, X } from 'lucide-react'
+import { Plus, X, Play } from 'lucide-react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { usePlayerStore, type PlayerTrack } from '@/store/player'
+import { formatDuration } from '@/lib/utils'
 
-const TABS = ['Playlists', 'Liked', 'Saved', 'Styles'] as const
+const TABS = ['Playlists', 'Liked', 'Recent', 'Styles'] as const
 type Tab = typeof TABS[number]
 
 interface Playlist {
@@ -18,10 +20,45 @@ interface Playlist {
   updatedAt: string
 }
 
+interface Track {
+  id: string
+  title: string
+  artistName: string
+  audioUrl: string
+  artworkUrl: string | null
+  durationSeconds: number
+  primaryGenre: string
+  moodsJson: string[]
+}
+
 interface Style {
   id: string
   name: string
   slug: string
+}
+
+function toPlayerTrack(t: Track): PlayerTrack {
+  return {
+    id: t.id, title: t.title, artistName: t.artistName, audioUrl: t.audioUrl,
+    artworkUrl: t.artworkUrl, durationSeconds: t.durationSeconds,
+    primaryGenre: t.primaryGenre, moods: t.moodsJson ?? [], recommendationReason: null,
+  }
+}
+
+function TrackRow({ track, index, onPlay }: { track: Track; index: number; onPlay: () => void }) {
+  return (
+    <div
+      className="flex items-center gap-3 p-3 rounded-xl bg-card border border-border hover:border-accent/30 transition-colors cursor-pointer"
+      onClick={onPlay}
+    >
+      <span className="text-text-muted text-xs w-5 text-right">{index + 1}</span>
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-text-primary truncate text-sm">{track.title}</p>
+        <p className="text-xs text-text-secondary truncate">{track.artistName} · <span className="capitalize">{track.primaryGenre}</span></p>
+      </div>
+      <span className="text-xs text-text-muted">{formatDuration(track.durationSeconds)}</span>
+    </div>
+  )
 }
 
 function CreatePlaylistModal({ onClose }: { onClose: () => void }) {
@@ -96,6 +133,7 @@ function CreatePlaylistModal({ onClose }: { onClose: () => void }) {
 export default function LibraryPage() {
   const [activeTab, setActiveTab] = useState<Tab>('Playlists')
   const [showCreate, setShowCreate] = useState(false)
+  const { loadQueue } = usePlayerStore()
 
   const { data: playlists } = useQuery<Playlist[]>({
     queryKey: ['playlists'],
@@ -103,11 +141,27 @@ export default function LibraryPage() {
     enabled: activeTab === 'Playlists',
   })
 
+  const { data: likedTracks } = useQuery<Track[]>({
+    queryKey: ['liked-tracks'],
+    queryFn: () => api.get<Track[]>('/tracks/liked'),
+    enabled: activeTab === 'Liked',
+  })
+
+  const { data: recentTracks } = useQuery<Track[]>({
+    queryKey: ['recently-played'],
+    queryFn: () => api.get<Track[]>('/tracks/recently-played'),
+    enabled: activeTab === 'Recent',
+  })
+
   const { data: followedStyles } = useQuery<Style[]>({
     queryKey: ['followed-styles'],
     queryFn: () => api.get<Style[]>('/styles/followed'),
     enabled: activeTab === 'Styles',
   })
+
+  const playFrom = (tracks: Track[], index: number) => {
+    loadQueue(tracks.map(toPlayerTrack), index)
+  }
 
   return (
     <>
@@ -122,6 +176,22 @@ export default function LibraryPage() {
               className="flex items-center gap-1 text-accent text-sm font-medium"
             >
               <Plus className="w-4 h-4" /> New
+            </button>
+          )}
+          {activeTab === 'Liked' && likedTracks && likedTracks.length > 0 && (
+            <button
+              onClick={() => playFrom(likedTracks, 0)}
+              className="flex items-center gap-1.5 text-accent text-sm font-medium"
+            >
+              <Play className="w-4 h-4" fill="currentColor" /> Play all
+            </button>
+          )}
+          {activeTab === 'Recent' && recentTracks && recentTracks.length > 0 && (
+            <button
+              onClick={() => playFrom(recentTracks, 0)}
+              className="flex items-center gap-1.5 text-accent text-sm font-medium"
+            >
+              <Play className="w-4 h-4" fill="currentColor" /> Play all
             </button>
           )}
         </div>
@@ -144,7 +214,7 @@ export default function LibraryPage() {
           ))}
         </div>
 
-        {/* Content */}
+        {/* Playlists */}
         {activeTab === 'Playlists' && (
           <div className="flex flex-col gap-3">
             {playlists?.length === 0 && (
@@ -156,9 +226,7 @@ export default function LibraryPage() {
             {playlists?.map(p => (
               <Link key={p.id} href={`/library/playlists/${p.id}`}>
                 <div className="flex items-center gap-4 p-4 rounded-2xl bg-card border border-border hover:border-muted transition-colors">
-                  <div className="w-12 h-12 rounded-xl bg-surface flex items-center justify-center text-text-muted">
-                    ♪
-                  </div>
+                  <div className="w-12 h-12 rounded-xl bg-surface flex items-center justify-center text-text-muted">♪</div>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-text-primary truncate">{p.name}</p>
                     <p className="text-sm text-text-secondary">{p._count.tracks} tracks · {p.visibility}</p>
@@ -169,6 +237,37 @@ export default function LibraryPage() {
           </div>
         )}
 
+        {/* Liked */}
+        {activeTab === 'Liked' && (
+          <div className="flex flex-col gap-2">
+            {likedTracks?.length === 0 && (
+              <div className="text-center py-16 text-text-muted">
+                <p className="text-lg mb-2">No liked tracks yet</p>
+                <p className="text-sm">Tap the heart while listening to save tracks here.</p>
+              </div>
+            )}
+            {likedTracks?.map((track, i) => (
+              <TrackRow key={track.id} track={track} index={i} onPlay={() => playFrom(likedTracks, i)} />
+            ))}
+          </div>
+        )}
+
+        {/* Recent */}
+        {activeTab === 'Recent' && (
+          <div className="flex flex-col gap-2">
+            {recentTracks?.length === 0 && (
+              <div className="text-center py-16 text-text-muted">
+                <p className="text-lg mb-2">Nothing played yet</p>
+                <p className="text-sm">Start listening and your history will appear here.</p>
+              </div>
+            )}
+            {recentTracks?.map((track, i) => (
+              <TrackRow key={track.id} track={track} index={i} onPlay={() => playFrom(recentTracks, i)} />
+            ))}
+          </div>
+        )}
+
+        {/* Styles */}
         {activeTab === 'Styles' && (
           <div className="flex flex-col gap-3">
             {followedStyles?.length === 0 && (
@@ -184,13 +283,6 @@ export default function LibraryPage() {
                 </div>
               </Link>
             ))}
-          </div>
-        )}
-
-        {(activeTab === 'Liked' || activeTab === 'Saved') && (
-          <div className="text-center py-16 text-text-muted">
-            <p className="text-lg mb-2">Coming soon</p>
-            <p className="text-sm">Like and save tracks while listening to see them here.</p>
           </div>
         )}
       </div>

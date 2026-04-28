@@ -97,6 +97,36 @@ export class TracksService {
     return { success: true }
   }
 
+  async getLikedTracks(userId: string, limit = 50) {
+    const likes = await this.prisma.like.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      include: { track: true },
+    })
+    return likes.map(l => l.track).filter(t => t.status === 'ready_public')
+  }
+
+  async getRecentlyPlayed(userId: string, limit = 30) {
+    const events = await this.prisma.listeningEvent.findMany({
+      where: { userId, eventType: 'play' },
+      orderBy: { createdAt: 'desc' },
+      take: limit * 3,
+      include: { track: true },
+    })
+    // Deduplicate by trackId, keep most recent
+    const seen = new Set<string>()
+    const tracks = []
+    for (const e of events) {
+      if (!seen.has(e.trackId) && e.track.status === 'ready_public') {
+        seen.add(e.trackId)
+        tracks.push(e.track)
+        if (tracks.length >= limit) break
+      }
+    }
+    return tracks
+  }
+
   async likeTrack(trackId: string, userId: string) {
     await this.prisma.track.findFirstOrThrow({ where: { id: trackId, ...PUBLIC_TRACK_FILTER } })
     await this.prisma.like.upsert({

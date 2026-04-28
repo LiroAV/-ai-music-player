@@ -47,27 +47,39 @@ export class RecommendationService {
       .slice(0, 3)
       .map(([k]) => k.replace('genre:', ''))
 
+    const topMoods = Object.entries(tasteVector)
+      .filter(([k]) => k.startsWith('mood:'))
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 3)
+      .map(([k]) => k.replace('mood:', ''))
+
+    const baseFilter = {
+      status: 'ready_public' as const,
+      visibility: 'public' as const,
+      moderationStatus: 'approved' as const,
+      id: { notIn: recentIds },
+    }
+
     const [personalized, adjacent, exploratory] = await Promise.all([
-      // Personalized: match top genres, high quality
+      // Personalized: match top genres or moods
       this.prisma.track.findMany({
         where: {
-          status: 'ready_public',
-          visibility: 'public',
-          moderationStatus: 'approved',
-          id: { notIn: recentIds },
-          ...(topGenres.length > 0 ? { primaryGenre: { in: topGenres } } : {}),
+          ...baseFilter,
+          ...((topGenres.length > 0 || topMoods.length > 0) ? {
+            OR: [
+              ...(topGenres.length > 0 ? [{ primaryGenre: { in: topGenres } }] : []),
+              ...(topMoods.length > 0 ? topMoods.map(m => ({ moodsJson: { string_contains: m } })) : []),
+            ],
+          } : {}),
         },
         orderBy: [{ qualityScore: 'desc' }, { createdAt: 'desc' }],
         take: personalizedCount,
       }),
 
-      // Adjacent: slightly different genres
+      // Adjacent: different genres, but might share moods
       this.prisma.track.findMany({
         where: {
-          status: 'ready_public',
-          visibility: 'public',
-          moderationStatus: 'approved',
-          id: { notIn: recentIds },
+          ...baseFilter,
           ...(topGenres.length > 0 ? { primaryGenre: { notIn: topGenres } } : {}),
         },
         orderBy: { qualityScore: 'desc' },
@@ -100,7 +112,7 @@ export class RecommendationService {
 
     return combined.map(t => ({
       ...t,
-      recommendationReason: this.buildReason(t, topGenres),
+      recommendationReason: this.buildReason(t, topGenres, topMoods),
     }))
   }
 
@@ -170,9 +182,14 @@ export class RecommendationService {
     return Math.max(0, Math.min(1, updated))
   }
 
-  private buildReason(track: Track, topGenres: string[]): string | null {
+  private buildReason(track: Track, topGenres: string[], topMoods: string[]): string | null {
     if (topGenres.includes(track.primaryGenre)) {
-      return `Recommended because you enjoy ${track.primaryGenre}`
+      return `Because you enjoy ${track.primaryGenre}`
+    }
+    const trackMoods = (track.moodsJson as string[]) ?? []
+    const sharedMood = trackMoods.find(m => topMoods.includes(m))
+    if (sharedMood) {
+      return `Matches your ${sharedMood} mood`
     }
     return null
   }
