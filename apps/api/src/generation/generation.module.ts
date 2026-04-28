@@ -4,6 +4,7 @@ import { GenerationController } from './generation.controller'
 import { GenerationService } from './generation.service'
 import { GenerationProcessor } from './generation.processor'
 import { MockGenerationProvider } from './providers/mock.provider'
+import { LyriaGenerationProvider } from './providers/lyria.provider'
 import { PromptBuilderService } from './prompt-builder.service'
 
 @Module({
@@ -16,9 +17,14 @@ import { PromptBuilderService } from './prompt-builder.service'
     GenerationProcessor,
     PromptBuilderService,
     MockGenerationProvider,
+    LyriaGenerationProvider,
     {
       provide: 'GENERATION_PROVIDER',
-      useClass: MockGenerationProvider,
+      useFactory: (mock: MockGenerationProvider, lyria: LyriaGenerationProvider) => {
+        const provider = process.env['GENERATION_PROVIDER'] ?? 'mock'
+        return provider === 'lyria' ? lyria : mock
+      },
+      inject: [MockGenerationProvider, LyriaGenerationProvider],
     },
   ],
   exports: [GenerationService],
