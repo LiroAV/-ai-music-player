@@ -1,17 +1,24 @@
 'use client'
 
-import { Play, Pause, SkipForward, SkipBack, Heart, Bookmark, ThumbsDown, X, Star } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { Play, Pause, SkipForward, SkipBack, Heart, Bookmark, ThumbsDown, X, Plus } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { usePlayerStore } from '@/store/player'
 import { formatDuration } from '@/lib/utils'
 import { ArtworkPlaceholder } from './MiniPlayer'
 import { cn } from '@/lib/utils'
+import { AddToPlaylistModal } from '@/components/AddToPlaylistModal'
 
 export function ExpandedPlayer() {
   const {
     currentTrack, status, positionSeconds,
     togglePlayPause, skipNext, skipPrev, setExpanded, isExpanded,
+    seekTo, interactions, toggleLike, toggleSave, sendDislike,
   } = usePlayerStore()
+
+  const [addModalOpen, setAddModalOpen] = useState(false)
+
+  const interaction = currentTrack ? (interactions[currentTrack.id] ?? { liked: false, saved: false }) : { liked: false, saved: false }
 
   return (
     <AnimatePresence>
@@ -23,6 +30,10 @@ export function ExpandedPlayer() {
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
           className="fixed inset-0 bg-background z-50 flex flex-col px-6 pt-12 pb-8"
         >
+          {addModalOpen && (
+            <AddToPlaylistModal trackId={currentTrack.id} onClose={() => setAddModalOpen(false)} />
+          )}
+
           {/* Header */}
           <div className="flex items-center justify-between mb-8">
             <button onClick={() => setExpanded(false)} className="text-text-secondary hover:text-text-primary">
@@ -63,11 +74,20 @@ export function ExpandedPlayer() {
           </div>
 
           {/* Progress bar */}
-          <ProgressBar position={positionSeconds} duration={currentTrack.durationSeconds} />
+          <SeekableProgressBar
+            position={positionSeconds}
+            duration={currentTrack.durationSeconds}
+            onSeek={seekTo}
+          />
 
           {/* Main controls */}
           <div className="flex items-center justify-between mt-6">
-            <ActionButton icon={ThumbsDown} label="Dislike" onClick={() => {}} />
+            <ActionButton
+              icon={ThumbsDown}
+              label="Dislike"
+              onClick={() => sendDislike(currentTrack.id)}
+              danger
+            />
             <button onClick={skipPrev} className="text-text-secondary hover:text-text-primary">
               <SkipBack className="w-7 h-7" />
             </button>
@@ -84,13 +104,30 @@ export function ExpandedPlayer() {
             <button onClick={skipNext} className="text-text-secondary hover:text-text-primary">
               <SkipForward className="w-7 h-7" />
             </button>
-            <ActionButton icon={Heart} label="Like" onClick={() => {}} />
+            <ActionButton
+              icon={Heart}
+              label="Like"
+              onClick={() => toggleLike(currentTrack.id)}
+              active={interaction.liked}
+              accent
+            />
           </div>
 
           {/* Secondary controls */}
           <div className="flex items-center justify-around mt-8">
-            <ActionButton icon={Bookmark} label="Save" onClick={() => {}} small />
-            <ActionButton icon={Star} label="Rate" onClick={() => {}} small />
+            <ActionButton
+              icon={Bookmark}
+              label="Save"
+              onClick={() => toggleSave(currentTrack.id)}
+              active={interaction.saved}
+              small
+            />
+            <ActionButton
+              icon={Plus}
+              label="Add"
+              onClick={() => setAddModalOpen(true)}
+              small
+            />
           </div>
         </motion.div>
       )}
@@ -98,14 +135,33 @@ export function ExpandedPlayer() {
   )
 }
 
-function ProgressBar({ position, duration }: { position: number; duration: number }) {
+function SeekableProgressBar({
+  position, duration, onSeek,
+}: { position: number; duration: number; onSeek: (s: number) => void }) {
+  const barRef = useRef<HTMLDivElement>(null)
   const pct = duration > 0 ? (position / duration) * 100 : 0
+
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!barRef.current) return
+    const rect = barRef.current.getBoundingClientRect()
+    const ratio = (e.clientX - rect.left) / rect.width
+    onSeek(Math.max(0, Math.min(duration, ratio * duration)))
+  }
+
   return (
     <div className="w-full">
-      <div className="relative w-full h-1 bg-border rounded-full overflow-hidden">
+      <div
+        ref={barRef}
+        onClick={handleClick}
+        className="relative w-full h-1 bg-border rounded-full overflow-hidden cursor-pointer group"
+      >
         <div
           className="absolute left-0 top-0 h-full bg-accent rounded-full transition-all"
           style={{ width: `${Math.min(100, pct)}%` }}
+        />
+        <div
+          className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow -ml-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+          style={{ left: `${Math.min(100, pct)}%` }}
         />
       </div>
       <div className="flex justify-between mt-1.5">
@@ -117,18 +173,32 @@ function ProgressBar({ position, duration }: { position: number; duration: numbe
 }
 
 function ActionButton({
-  icon: Icon, label, onClick, small,
-}: { icon: React.ElementType; label: string; onClick: () => void; small?: boolean }) {
+  icon: Icon, label, onClick, small, active, accent, danger,
+}: {
+  icon: React.ElementType
+  label: string
+  onClick: () => void
+  small?: boolean
+  active?: boolean
+  accent?: boolean
+  danger?: boolean
+}) {
   return (
     <button
       onClick={onClick}
       className={cn(
-        'flex flex-col items-center gap-1 text-text-secondary hover:text-text-primary transition-colors',
-        small ? 'text-xs' : 'text-xs',
+        'flex flex-col items-center gap-1 transition-colors',
+        accent && active ? 'text-accent' :
+        active ? 'text-accent' :
+        danger ? 'text-red-400 hover:text-red-300' :
+        'text-text-secondary hover:text-text-primary',
       )}
     >
-      <Icon className={cn(small ? 'w-5 h-5' : 'w-6 h-6')} />
-      <span>{label}</span>
+      <Icon
+        className={cn(small ? 'w-5 h-5' : 'w-6 h-6')}
+        fill={active ? 'currentColor' : 'none'}
+      />
+      <span className="text-xs">{label}</span>
     </button>
   )
 }

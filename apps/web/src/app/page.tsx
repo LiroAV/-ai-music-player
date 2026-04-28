@@ -1,6 +1,18 @@
+'use client'
+
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useAuthStore } from '@/store/auth'
 
 export default function LandingPage() {
+  const router = useRouter()
+  const session = useAuthStore(s => s.session)
+
+  useEffect(() => {
+    if (session) router.replace('/home')
+  }, [session, router])
+
   return (
     <main className="min-h-screen bg-background flex flex-col items-center justify-center px-6 text-center">
       {/* Logo */}
@@ -16,7 +28,6 @@ export default function LandingPage() {
         <h1 className="text-5xl font-bold tracking-tight text-gradient">Music Gem</h1>
       </div>
 
-      {/* Headline */}
       <h2 className="text-4xl md:text-5xl font-bold text-text-primary max-w-xl leading-tight mb-4">
         Find your sound.
       </h2>
@@ -24,23 +35,21 @@ export default function LandingPage() {
         Listen, like, skip, and discover music that adapts to your taste.
       </p>
 
-      {/* CTAs */}
       <div className="flex flex-col sm:flex-row gap-4">
         <Link
-          href="/onboarding"
+          href="/auth/signup"
           className="px-8 py-4 rounded-2xl bg-accent text-white font-semibold text-lg hover:bg-accent/90 transition-colors"
         >
           Start discovering
         </Link>
         <Link
-          href="/onboarding?step=styles"
+          href="/auth/login"
           className="px-8 py-4 rounded-2xl bg-card border border-border text-text-primary font-semibold text-lg hover:bg-surface transition-colors"
         >
-          Choose styles manually
+          Sign in
         </Link>
       </div>
 
-      {/* Feature hints */}
       <div className="mt-20 grid grid-cols-3 gap-8 max-w-xl text-center">
         {[
           { icon: '♪', label: 'Personalized feed' },

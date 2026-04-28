@@ -2,14 +2,16 @@
 
 import { useEffect, useRef } from 'react'
 import { usePlayerStore } from '@/store/player'
+import { api } from '@/lib/api'
 
-// Invisible component that owns the <audio> element and syncs with Zustand
 export function AudioEngine() {
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const { currentTrack, status, volume, positionSeconds, setPosition, setStatus, skipNext, sessionId } =
+  const playStartRef = useRef<number>(0)
+  const lastTrackIdRef = useRef<string | null>(null)
+
+  const { currentTrack, status, volume, setPosition, setStatus, skipNext, sessionId } =
     usePlayerStore()
 
-  // Init audio element once
   useEffect(() => {
     if (!audioRef.current) {
       audioRef.current = new Audio()
@@ -18,7 +20,10 @@ export function AudioEngine() {
     const audio = audioRef.current
 
     const onTimeUpdate = () => setPosition(audio.currentTime)
-    const onEnded = () => skipNext()
+    const onEnded = () => {
+      sendEvent('complete', audio.duration)
+      skipNext()
+    }
     const onError = () => setStatus('error')
     const onCanPlay = () => { if (status === 'loading') setStatus('playing') }
 
@@ -35,13 +40,25 @@ export function AudioEngine() {
     }
   }, [setPosition, setStatus, skipNext, status])
 
-  // Sync src when track changes
+  // Track changes — send play event for new track
   useEffect(() => {
     const audio = audioRef.current
     if (!audio || !currentTrack) return
-    if (audio.src !== currentTrack.audioUrl) {
-      audio.src = currentTrack.audioUrl
-      audio.load()
+
+    if (currentTrack.id !== lastTrackIdRef.current) {
+      // Send skip for the previous track if it had started
+      if (lastTrackIdRef.current && audio.currentTime > 0) {
+        sendEvent('skip', audio.currentTime, lastTrackIdRef.current)
+      }
+      lastTrackIdRef.current = currentTrack.id
+      playStartRef.current = Date.now()
+
+      if (audio.src !== currentTrack.audioUrl) {
+        audio.src = currentTrack.audioUrl
+        audio.load()
+      }
+
+      sendEvent('play', 0)
     }
   }, [currentTrack])
 
@@ -61,5 +78,21 @@ export function AudioEngine() {
     if (audioRef.current) audioRef.current.volume = volume
   }, [volume])
 
-  return null  // invisible
+  return null
+}
+
+function sendEvent(
+  eventType: string,
+  positionSeconds: number,
+  overrideTrackId?: string,
+) {
+  const { currentTrack, sessionId } = usePlayerStore.getState()
+  const trackId = overrideTrackId ?? currentTrack?.id
+  if (!trackId) return
+
+  api.post(`/tracks/${trackId}/play-event`, {
+    eventType,
+    positionSeconds: Math.round(positionSeconds),
+    sessionId,
+  }).catch(() => {}) // fire-and-forget, don't surface errors to user
 }

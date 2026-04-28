@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { generateSessionId } from '@/lib/utils'
+import { api } from '@/lib/api'
 
 export interface PlayerTrack {
   id: string
@@ -15,6 +16,11 @@ export interface PlayerTrack {
 
 type PlayerStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'error'
 
+interface TrackInteraction {
+  liked: boolean
+  saved: boolean
+}
+
 interface PlayerState {
   queue: PlayerTrack[]
   currentIndex: number
@@ -23,6 +29,7 @@ interface PlayerState {
   sessionId: string
   isExpanded: boolean
   volume: number
+  interactions: Record<string, TrackInteraction>
 
   // Derived
   currentTrack: PlayerTrack | null
@@ -41,6 +48,17 @@ interface PlayerState {
   setExpanded: (expanded: boolean) => void
   setVolume: (volume: number) => void
   newSession: () => void
+  toggleLike: (trackId: string) => void
+  toggleSave: (trackId: string) => void
+  sendDislike: (trackId: string) => void
+}
+
+function sendEvent(trackId: string, eventType: string, positionSeconds: number, sessionId: string) {
+  api.post(`/tracks/${trackId}/play-event`, {
+    eventType,
+    positionSeconds: Math.round(positionSeconds),
+    sessionId,
+  }).catch(() => {})
 }
 
 export const usePlayerStore = create<PlayerState>((set, get) => ({
@@ -51,6 +69,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   sessionId: generateSessionId(),
   isExpanded: false,
   volume: 0.8,
+  interactions: {},
 
   get currentTrack() {
     const { queue, currentIndex } = get()
@@ -95,4 +114,26 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   setExpanded: (expanded) => set({ isExpanded: expanded }),
   setVolume: (volume) => set({ volume }),
   newSession: () => set({ sessionId: generateSessionId() }),
+
+  toggleLike: (trackId) => {
+    const { interactions, positionSeconds, sessionId } = get()
+    const current = interactions[trackId] ?? { liked: false, saved: false }
+    const newLiked = !current.liked
+    set({ interactions: { ...interactions, [trackId]: { ...current, liked: newLiked } } })
+    sendEvent(trackId, newLiked ? 'like' : 'skip', positionSeconds, sessionId)
+  },
+
+  toggleSave: (trackId) => {
+    const { interactions, positionSeconds, sessionId } = get()
+    const current = interactions[trackId] ?? { liked: false, saved: false }
+    const newSaved = !current.saved
+    set({ interactions: { ...interactions, [trackId]: { ...current, saved: newSaved } } })
+    sendEvent(trackId, newSaved ? 'save' : 'unsave', positionSeconds, sessionId)
+  },
+
+  sendDislike: (trackId) => {
+    const { positionSeconds, sessionId } = get()
+    sendEvent(trackId, 'dislike', positionSeconds, sessionId)
+    get().skipNext()
+  },
 }))

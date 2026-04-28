@@ -1,7 +1,10 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
+import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
+import { createClient } from '@/lib/supabase'
+import { useAuthStore } from '@/store/auth'
 
 interface TasteProfile {
   topGenres: Array<{ genre: string; score: number }>
@@ -11,14 +14,28 @@ interface TasteProfile {
 }
 
 export default function ProfilePage() {
+  const router = useRouter()
+  const session = useAuthStore(s => s.session)
+
   const { data: profile } = useQuery<TasteProfile>({
     queryKey: ['taste-profile'],
     queryFn: () => api.get<TasteProfile>('/profile'),
   })
 
+  const handleSignOut = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/')
+  }
+
   return (
     <div className="px-5 pt-12 pb-4">
-      <h1 className="text-2xl font-bold text-text-primary mb-6">Your taste profile</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-text-primary">Your taste profile</h1>
+        {session?.user?.email && (
+          <p className="text-xs text-text-muted truncate max-w-[140px]">{session.user.email}</p>
+        )}
+      </div>
 
       {profile && (
         <>
@@ -94,6 +111,14 @@ export default function ProfilePage() {
               <span className="text-text-muted">›</span>
             </button>
           ))}
+
+          <button
+            onClick={handleSignOut}
+            className="flex items-center justify-between p-4 rounded-2xl bg-card border border-border text-left mt-2"
+          >
+            <span className="text-red-400 text-sm font-medium">Sign out</span>
+            <span className="text-text-muted">›</span>
+          </button>
         </div>
       </section>
     </div>

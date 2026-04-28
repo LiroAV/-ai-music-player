@@ -1,6 +1,7 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { Play, Heart } from 'lucide-react'
@@ -31,6 +32,7 @@ interface Track {
 
 export default function StylePage() {
   const { slug } = useParams<{ slug: string }>()
+  const queryClient = useQueryClient()
 
   const { data: styles } = useQuery<Style[]>({ queryKey: ['styles'], queryFn: () => api.get<Style[]>('/styles') })
   const style = styles?.find(s => s.slug === slug)
@@ -45,6 +47,22 @@ export default function StylePage() {
     queryKey: ['style-related', style?.id],
     queryFn: () => api.get<Style[]>(`/styles/${style!.id}/related`),
     enabled: !!style?.id,
+  })
+
+  const [followed, setFollowed] = useState<boolean | null>(null)
+  const isFollowed = followed ?? style?.isFollowed ?? false
+
+  const followMutation = useMutation({
+    mutationFn: () =>
+      isFollowed
+        ? api.delete(`/styles/${style!.id}/follow`)
+        : api.post(`/styles/${style!.id}/follow`, {}),
+    onMutate: () => setFollowed(!isFollowed),
+    onError: () => setFollowed(isFollowed),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['styles'] })
+      queryClient.invalidateQueries({ queryKey: ['followed-styles'] })
+    },
   })
 
   const { loadQueue } = usePlayerStore()
@@ -81,8 +99,17 @@ export default function StylePage() {
         >
           <Play className="w-4 h-4" fill="white" /> Play
         </button>
-        <button className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-card border border-border text-text-secondary font-semibold">
-          <Heart className="w-4 h-4" /> Follow
+        <button
+          onClick={() => followMutation.mutate()}
+          disabled={followMutation.isPending}
+          className={`flex items-center gap-2 px-6 py-3 rounded-2xl border font-semibold transition-colors ${
+            isFollowed
+              ? 'bg-accent/20 border-accent/40 text-accent'
+              : 'bg-card border-border text-text-secondary'
+          }`}
+        >
+          <Heart className="w-4 h-4" fill={isFollowed ? 'currentColor' : 'none'} />
+          {isFollowed ? 'Following' : 'Follow'}
         </button>
       </div>
 

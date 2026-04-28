@@ -1,10 +1,22 @@
 const API_URL = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3001'
 
+function getToken(): string | null {
+  try {
+    // Dynamically import to avoid circular deps — read from store state directly
+    const { useAuthStore } = require('@/store/auth')
+    return useAuthStore.getState().token()
+  } catch {
+    return null
+  }
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const token = getToken()
   const res = await fetch(`${API_URL}/api${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options?.headers,
     },
   })
@@ -18,19 +30,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  get: <T>(path: string, token?: string) =>
-    request<T>(path, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined),
-
-  post: <T>(path: string, body: unknown, token?: string) =>
-    request<T>(path, {
-      method: 'POST',
-      body: JSON.stringify(body),
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    }),
-
-  delete: <T>(path: string, token?: string) =>
-    request<T>(path, {
-      method: 'DELETE',
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    }),
+  get: <T>(path: string) => request<T>(path),
+  post: <T>(path: string, body: unknown) =>
+    request<T>(path, { method: 'POST', body: JSON.stringify(body) }),
+  patch: <T>(path: string, body?: unknown) =>
+    request<T>(path, { method: 'PATCH', body: body ? JSON.stringify(body) : undefined }),
+  delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
 }
