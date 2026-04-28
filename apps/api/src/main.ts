@@ -10,8 +10,19 @@ async function bootstrap() {
 
   app.use(helmet())
 
+  const allowedOrigins = [
+    process.env['FRONTEND_URL'] ?? 'http://localhost:3000',
+    'https://ai-music-player-web.vercel.app',
+  ]
+
   app.enableCors({
-    origin: process.env['FRONTEND_URL'] ?? 'http://localhost:3000',
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.some(o => origin.startsWith(o))) {
+        callback(null, true)
+      } else {
+        callback(null, false)
+      }
+    },
     credentials: true,
   })
 
@@ -24,6 +35,12 @@ async function bootstrap() {
   )
 
   app.setGlobalPrefix('api')
+
+  // Health check (used by Railway)
+  const httpAdapter = app.getHttpAdapter()
+  httpAdapter.get('/api/health', (_req: unknown, res: { json: (body: object) => void }) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() })
+  })
 
   const config = new DocumentBuilder()
     .setTitle('Music Gem API')
